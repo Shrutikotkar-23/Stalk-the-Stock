@@ -52,8 +52,7 @@
 </script>
 
 <script>
-    function fetchData() {
-        var watchquery = "{{query}}";
+    function fetchIncomeData() {
         fetch(`/api/incomecalculate`)
             .then(response => {
                 if (!response.ok) {
@@ -62,61 +61,52 @@
                 return response.json();
             })
             .then(data => {
-                console.log(data)
-                // Process the fetched data here
-                if(data>0){
+                console.log(data);
+                const profitloss = document.getElementById("profitloss");
+
+                if (data > 0) {
                     profitloss.classList.add("dark:text-green-500");
-                }
-                else{
+                } else {
                     profitloss.classList.add("dark:text-red-500");
                 }
-                profitloss=document.getElementById("profitloss")
-                profitloss.innerHTML = "&#36; "+ data;
-                // document.getElementById("currentprice").value = currentPrice;
+
+                profitloss.innerHTML = "&#36; " + data;
             })
             .catch(error => {
                 console.error('There was a problem with the fetch operation:', error);
             });
     }
 
-    // Call the fetchData function immediately
-    fetchData();
-
-    // Call the fetchData function every 5 seconds
-    setInterval(fetchData, 5000); // Adjust the interval as needed
-
+    fetchIncomeData();
+    setInterval(fetchIncomeData, 5000);
 </script>
 
 <script>
-    function fetchData() {
-        var watchquery = "{{query}}";
-        fetch(`/api/holdings/${watchquery}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log(data)
-                // Process the fetched data here
-
-                currentlyholding=document.getElementById("currentlyholding")
-                currentlyholding.innerHTML = data;
-                // document.getElementById("currentprice").value = currentPrice;
-            })
-            .catch(error => {
-                console.error('There was a problem with the fetch operation:', error);
-            });
+    function fetchHoldingsData() {
+        var watchquery = "{{ query|escapejs }}";
+        if (watchquery !== "") {
+            fetch(`/api/holdings/${watchquery}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log(data);
+                    const currentlyholding = document.getElementById("currentlyholding");
+                    currentlyholding.innerHTML = data.quantity;
+                })
+                .catch(error => {
+                    console.error('There was a problem with the fetch operation:', error);
+                });
+        }
     }
 
-    // Call the fetchData function immediately
-    fetchData();
-
-    // Call the fetchData function every 5 seconds
-    setInterval(fetchData, 5000); // Adjust the interval as needed
-
+    fetchHoldingsData();
+    setInterval(fetchHoldingsData, 5000);
 </script>
+
 
 <div class="flex dark:bg-gray-800">
     <button data-drawer-target="logo-sidebar" data-drawer-toggle="logo-sidebar" aria-controls="logo-sidebar"
@@ -190,7 +180,7 @@
     <div class="h-full px-3 py-2 overflow-y-auto bg-gray-50 dark:bg-gray-800">
         <a href="https://flowbite.com/" class="flex items-center ps-2.5 mb-5">
             <img src="https://flowbite.com/docs/images/logo.svg" class="h-6 me-3 sm:h-7" alt="Investa Logo" />
-            <span class="self-center text-xl font-semibold whitespace-nowrap dark:text-white">Investa</span>
+            <span class="self-center text-xl font-semibold whitespace-nowrap dark:text-white">Stalk-the-Stock</span>
         </a>
         <ul class="space-y-2 font-medium">
 
@@ -214,7 +204,7 @@
                 <p class="font-normal text-xl text-gray-700 dark:text-gray-300" id="marketstatus"></p>
         </div>
 
-            <div class=" {{currentlyholding}} block max-w-sm p-4 px-6 pl-6 bg-white border border-gray-200 rounded-lg shadow hover:bg-gray-100 dark:bg-gray-900 dark:border-gray-700">
+            <div class="{{currentlyholding}} block max-w-sm p-4 px-6 pl-6 bg-white border border-gray-200 rounded-lg shadow hover:bg-gray-100 dark:bg-gray-900 dark:border-gray-700">
 
                 <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Holdings :</h5>
                 <p class="font-normal text-xl text-gray-700 dark:text-gray-300" id="currentlyholding"></p>

@@ -40,10 +40,8 @@
                                         label: "Total Investment",
                                         fontFamily: "Inter, sans-serif",
                                         formatter: function (w) {
-                                            const sum = w.globals.seriesTotals.reduce((a, b) => {
-                                                return a + b
-                                            }, 0)
-                                            return '$' + sum
+                                            const sum = w.globals.seriesTotals.reduce((a, b) => a + b, 0);
+        return '$' + sum.toFixed(2);  // ✅ Fixed here
                                         },
                                     },
                                     value: {
@@ -51,7 +49,7 @@
                                         fontFamily: "Inter, sans-serif",
                                         offsetY: -20,
                                         formatter: function (value) {
-                                            return value
+                                            return value.toFixed(2);
                                         },
                                     },
                                 },
@@ -105,7 +103,7 @@
         });
 
 </script>
-<script>
+<!-- <script>
     document.addEventListener('DOMContentLoaded', function () {
         fetch(`/api/portfolio`)
             .then(response => {
@@ -174,7 +172,46 @@
                 console.error('There was a problem with the fetch operation:', error);
             });
     });
+</script> -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    fetch(`/api/portfolio`)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            const tableBody = document.getElementById('stock-table-body');
+
+            data.forEach(stock => {
+                const row = document.createElement('tr');
+                row.className = 'bg-white border-b dark:bg-gray-800 dark:border-gray-700';
+
+                console.log("Rendering row for", stock.symbol, "with avg price:", stock.averageprice);
+
+
+                row.innerHTML = `
+                    <th class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">${stock.symbol[0]}</th>
+                    <td class="px-6 py-4">${stock.quantity}</td>
+                    <td class="px-6 py-4">${stock.averageprice}</td>
+                    <td class="px-6 py-4">${stock.currentvalue}</td>
+                    <td class="px-6 py-4 ${stock.change > 0 ? 'text-green-500' : 'text-red-600'}">${stock.change}</td>
+                    <td class="px-6 py-4">
+                        <a href="/details/${stock.symbol[0]}" class="font-medium text-blue-600 dark:text-blue-500 hover:underline">Edit</a>
+                    </td>
+                `;
+
+                tableBody.appendChild(row);
+            });
+        })
+        .catch(error => {
+            console.error('There was a problem with the fetch operation:', error);
+        });
+});
 </script>
+
+
+
 
 <script>
     // Array of stock symbols to fetch data for
