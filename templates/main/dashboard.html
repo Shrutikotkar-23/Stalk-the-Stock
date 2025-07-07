@@ -3,57 +3,67 @@
 {% block dashboard %}
 
 <script>
-    // Array of stock symbols to fetch data for
-    const symbol = "{{stocklist|escapejs}}";
+    const symbol = "{{stocklist|escapejs}}";  // only watchlist companies
     const start = "{{start|escapejs}}";
     const end = "{{end|escapejs}}";
 
-    console.log(symbol);
+    const symbols = JSON.parse(symbol.replace(/'/g, '"'));
+    console.log("Watchlist symbols:", symbols);
 
-    var symbols = JSON.parse(symbol.replace(/'/g, '"'));
-
-    // Function to fetch data for each symbol and combine it
+    // Fetch chart data for all watchlist symbols
     const fetchDataForSymbols = async () => {
-        // Array to store promises for each fetch operation
-        const promises = symbols.map(symbol => {
-            return fetch(`/api/graphdata/${symbol}/${start}/${end}`)
+        const promises = symbols.map(sym =>
+            fetch(`/api/graphdata/${sym}/${start}/${end}`)
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error('Network response was not ok');
+                        console.warn(`No data for ${sym}`);
+                        return null;
                     }
-                    return response.json();
+                    return response.json().then(data => ({ sym, data }));
                 })
-                .then(data => {
-                    // Process data for each symbol here
-                    return {
-                        symbol: symbol,
-                        data: data
-                    };
-                });
-        });
+                .catch(() => null)
+        );
 
-        // Wait for all fetch operations to complete
         const results = await Promise.all(promises);
+        const combinedData = { date: [] };
 
-        // Process and combine data for all symbols
-        const combinedData = results.reduce((acc, { symbol, data }) => {
-            // Combine data for each symbol as needed
-            acc.date = data.date;
-            acc[symbol] = data.close;
-            return acc;
-        }, { date: [] });
+        for (const result of results) {
+            if (result && result.data && result.data.date && result.data.close.length > 0) {
+                if (combinedData.date.length === 0) {
+                    combinedData.date = result.data.date;
+                }
+                combinedData[result.sym] = result.data.close;
+            }
+        }
 
-        console.log(combinedData);
         return combinedData;
     };
 
-    // Initialize or update the chart with new data
+    // Chart reference
     let chart;
+
     const initializeChart = (symbol, combinedData) => {
         const data = combinedData[symbol];
-        document.getElementById("watchstockprice").innerHTML=symbol
+        if (!data) {
+            document.getElementById("watchstockprice").innerText = "No valid stock data";
+            return;
+        }
+
+        document.getElementById("watchstockprice").innerText = symbol;
 
         const options = {
+            chart: {
+                type: 'area',
+                height: '260px',
+                width: '100%',
+                fontFamily: "Inter, sans-serif",
+                toolbar: { show: false },
+                dropShadow: { enabled: false }
+            },
+            series: [{
+                name: symbol,
+                data: data
+            }],
             xaxis: {
                 categories: combinedData.date,
                 labels: {
@@ -63,66 +73,30 @@
                         cssClass: 'text-xs font-normal fill-gray-500 dark:fill-gray-400'
                     }
                 },
-                axisBorder: {
-                    show: false,
-                },
-                axisTicks: {
-                    show: true,
-                },
-                tickAmount: {
-                    show: false,
-                },
+                axisTicks: { show: false },
+                axisBorder: { show: false },
             },
             yaxis: {
                 show: true,
                 labels: {
-                    show: true,
+                    formatter: value => '$' + value.toFixed(2),
                     style: {
                         fontFamily: "Inter, sans-serif",
                         cssClass: 'text-xs font-normal fill-gray-500 dark:fill-gray-400'
-                    },
-                    formatter: function (value) {
-                        return '$' + value;
                     }
                 }
             },
-            series: [{
-                name: symbol,
-                data: data
-            }],
-            chart: {
-                height: "110%",
-                maxWidth: "100%",
-                type: "area",
-                fontFamily: "Inter, sans-serif",
-                dropShadow: {
-                    enabled: false,
-                },
-                toolbar: {
-                    show: false,
-                },
-            },
+            dataLabels: { enabled: false },
+            stroke: { width: 4 },
             tooltip: {
+                x: { show: true },
                 enabled: true,
-                x: {
-                    show: false,
-                },
-            },
-            dataLabels: {
-                enabled: false,
-            },
-            stroke: {
-                width: 6,
             },
             grid: {
                 show: true,
                 strokeDashArray: 4,
-                padding: {
-                    left: 2,
-                    right: 2,
-                    top: -26
-                },
-            },
+                padding: { left: 2, right: 2, top: 0, bottom: 0 }
+            }
         };
 
         if (chart) {
@@ -133,68 +107,106 @@
         }
     };
 
-    // Fetch data for all symbols and render the initial chart
-    let combinedDataCache;
-    fetchDataForSymbols()
-        .then(combinedData => {
-            combinedDataCache = combinedData;
-            // Initialize the chart with the first symbol by default
-            initializeChart(symbols[0], combinedData);
-        })
-        .catch(error => {
-            console.error('There was a problem with fetching data:', error);
-        });
+    // Immediately fetch data for the first symbol and plot
+    (async () => {
+        if (symbols.length > 0) {
+            try {
+                const response = await fetch(`/api/graphdata/${symbols[0]}/${start}/${end}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.date && data.close && data.date.length > 0 && data.close.length > 0) {
+                        const options = {
+                            chart: {
+                                type: 'line',
+                                height: 300,
+                            },
+                            series: [{
+                                name: symbols[0],
+                                data: data.close,
+                            }],
+                            xaxis: {
+                                categories: data.date,
+                            },
+                            stroke: {
+                                curve: 'smooth',
+                            },
+                            title: {
+                                text: symbols[0] + ' Live Price',
+                                align: 'left',
+                            },
+                        };
+                        if (window.firstStockChart) {
+                            window.firstStockChart.updateOptions(options);
+                        } else {
+                            window.firstStockChart = new ApexCharts(document.getElementById('labels-chart'), options);
+                            window.firstStockChart.render();
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching live chart:', err);
+            }
+        }
+    })();
 
-    // Function to fetch and render the table data
-
-    function fetchData() {
-        var watchquery = "{{ watchlist|escapejs }}";  // Safe interpolation
+    // Fetch and update watchlist table
+    async function fetchData() {
+        var watchquery = "{{ watchlist|escapejs }}"; // Safe interpolation
 
         if (watchquery !== "") {
             fetch(`/api/watchlist/${watchquery}`)
                 .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
+                    if (!response.ok) throw new Error('Network response was not ok');
                     return response.json();
                 })
                 .then(data => {
                     const stocksData = data;
                     const stocksTableBody = document.getElementById('stocksTableBody');
-
                     stocksTableBody.innerHTML = '';
+
+                    if (stocksData.stocks.length === 0) {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td colspan="4" class="text-center px-6 py-4 text-gray-500">No stocks in your watchlist yet.</td>
+                        `;
+                        stocksTableBody.appendChild(row);
+                        return;
+                    }
 
                     stocksData.stocks.forEach(stock => {
                         const [symbol, price, change, removelink, statuss] = stock;
-
-                        const mstatus = document.getElementById('marketstatus');
-                        mstatus.innerHTML = statuss;
+                        document.getElementById('marketstatus').innerHTML = statuss;
 
                         const row = document.createElement('tr');
                         row.classList.add('bg-white', 'border-b', 'dark:bg-gray-800', 'dark:border-gray-700');
 
                         const symbolCell = document.createElement('th');
                         symbolCell.scope = 'row';
-                        symbolCell.classList.add('px-6', 'py-4', 'font-medium', 'text-gray-900', 'whitespace-nowrap', 'dark:text-white');
+                        symbolCell.className = 'px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white';
                         const symbolButton = document.createElement('button');
-                        symbolButton.classList.add('symbol-button');
+                        symbolButton.className = 'symbol-button';
                         symbolButton.textContent = symbol;
-                        symbolButton.addEventListener('click', () => initializeChart(symbol, combinedDataCache));
+                        symbolButton.addEventListener('click', () => {
+                            if (combinedDataCache[symbol]) {
+                                document.getElementById("watchstockprice").innerText = symbol;
+                                initializeChart(symbol, combinedDataCache);
+                            }
+                        });
                         symbolCell.appendChild(symbolButton);
 
                         const priceCell = document.createElement('td');
-                        priceCell.classList.add('px-6', 'py-4');
+                        priceCell.className = 'px-6 py-4';
                         priceCell.textContent = price;
 
                         const changeCell = document.createElement('td');
-                        changeCell.classList.add('px-6', 'py-4', change > 0 ? 'text-green-500' : 'text-red-600');
+                        changeCell.className = 'px-6 py-4 ' + (change > 0 ? 'text-green-500' : 'text-red-600');
                         changeCell.textContent = change;
 
                         const actionCell = document.createElement('td');
-                        actionCell.classList.add('px-2', 'py-4');
+                        actionCell.className = 'px-2 py-4';
                         const editLink = document.createElement('a');
                         editLink.href = removelink;
-                        editLink.classList.add('font-medium', 'text-blue-600', 'dark:text-blue-500', 'hover:underline');
+                        editLink.className = 'font-medium text-blue-600 dark:text-blue-500 hover:underline';
                         editLink.textContent = 'Remove';
                         actionCell.appendChild(editLink);
 
@@ -204,71 +216,53 @@
                         row.appendChild(actionCell);
 
                         stocksTableBody.appendChild(row);
-                });
+                    });
                 })
                 .catch(error => {
-                    console.error('There was a problem with the fetch operation:', error);
+                    console.error('Fetch error:', error);
                 });
         }
     }
 
     fetchData();
     setInterval(fetchData, 5000);
-</script>
+</script> 
 
 
 <div class="p-4 border-2 border-gray-200 border-line dark:border-gray-700">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-        <div class="flex h-96 w-full rounded bg-gray-50 dark:bg-gray-800 col-span-1 pl-2">
-            <div class="flex flex-col h-full pt-2">
-                <div class="flex items-center h-1/3 w-full dark:bg-gray-800 pl-2">
-                    <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Your WatchList:
-                    </h5>
-                </div>
-                <div class="flex items-center justify-center h-96 w-96">
-                    <div class=" h-80 overflow-x-auto shadow-md sm:rounded-lg">
-                        <table class="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
-                            <thead
-                                class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                                <tr>
-                                    <th scope="col" class="px-6 py-3">
-                                        Name
-                                    </th>
-                                    <th scope="col" class="px-6 py-3">
-                                        Price
-                                    </th>
-                                    <th scope="col" class="px-6 py-3">
-                                        Change
-                                    </th>
-                                    <th scope="col" class="px-2 py-3">
-                                        Action
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody id="stocksTableBody">
+    <div class="flex flex-col md:flex-row gap-4 mb-4"> 
+    <!-- WatchList Box (Left Side) -->
+        <div class="w-full md:w-2/5 bg-gray-50 dark:bg-gray-800 rounded p-4 h-[420px] overflow-hidden">
+            <h5 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Your WatchList:</h5>
+            <div class="overflow-y-auto max-h-[340px]">
+                <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-100 dark:bg-gray-700 dark:text-gray-400">
+                        <tr>
+                            <th class="px-4 py-2">Name</th>
+                            <th class="px-4 py-2">Price</th>
+                            <th class="px-4 py-2">Change</th>
+                            <th class="px-2 py-2">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stocksTableBody">
+                        <!-- JS fills this -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-                            </tbody>
-                        </table>
-                    </div>
-
+        <!-- Chart Box (Right Side) -->
+        <div class="w-full md:w-3/5 bg-white dark:bg-gray-800 rounded shadow p-4 h-[420px]">
+            <div class="flex justify-between items-center pb-2">
+                <div>
+                    <h5 id="watchstockprice" class="text-3xl font-bold text-gray-900 dark:text-white"></h5>
+                    <p class="text-base text-gray-500 dark:text-gray-400"></p>
                 </div>
             </div>
-
+            <div id="labels-chart" class="w-full h-[300px] overflow-hidden px-2"></div>
         </div>
-        <div class="flex items-center justify-center h-96 w-full rounded bg-gray-50 dark:bg-gray-800 col-span-2">
-            <div class="w-full h-full bg-white rounded-lg shadow dark:bg-gray-800">
-                <div class="flex justify-between p-4 md:p-6 pb-0 md:pb-0">
-                    <div>
-                        <h5 id="watchstockprice" class="leading-none text-3xl font-bold text-gray-900 dark:text-white pb-2">${{totalbalance}}
-                        </h5>
-                        <p class="text-base font-normal text-gray-500 dark:text-gray-400"></p>
-                    </div>
-                </div>
-                <div id="labels-chart" class="px-2.5"></div>
-            </div>
+    </div> 
 
-        </div>
-    </div>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div class="flex h-96 w-full rounded bg-gray-50 dark:bg-gray-800 col-span-2 pl-2">
             <div class="flex flex-col h-full pt-2">
@@ -475,7 +469,7 @@
                 })
                 .then(data => {
                     const tableBody = document.getElementById('stock-table-body');
-                    tableBody.innerHTML = ""; 
+                    tableBody.innerHTML = "";
 
                     data.forEach(stock => {
                         const row = document.createElement('tr');
@@ -483,16 +477,15 @@
 
                         const symbolCell = document.createElement('th');
                         symbolCell.className = 'px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white';
-                        symbolCell.textContent = stock.symbol[0]; // Assuming symbol is always a list with one element
+                        symbolCell.textContent = stock.symbol[0];
 
                         const quantityCell = document.createElement('td');
                         quantityCell.className = 'px-6 py-4';
-                        quantityCell.textContent = stock.quantity[0]; // Assuming quantity is always a list with one element
+                        quantityCell.textContent = stock.quantity[0];
 
-                    
                         const averagePriceCell = document.createElement('td');
                         averagePriceCell.className = 'px-6 py-4';
-                        averagePriceCell.textContent = stock.averageprice; // Assuming averageprice is always a list with one element
+                        averagePriceCell.textContent = stock.averageprice;
 
                         const currentPriceCell = document.createElement('td');
                         currentPriceCell.className = 'px-6 py-4';
@@ -514,7 +507,6 @@
                         row.appendChild(symbolCell);
                         row.appendChild(quantityCell);
                         row.appendChild(averagePriceCell);
-        
                         row.appendChild(currentPriceCell);
                         row.appendChild(changeCell);
                         row.appendChild(actionsCell);
@@ -526,6 +518,7 @@
                     console.error('There was a problem with the fetch operation:', error);
                 });
         });
+
     </script>
 
 

@@ -18,10 +18,6 @@
                 if (query.length > 0) {
                     let response = await fetch(`/api/search/${query}`);
                     const data = await response.json();
-                    // console.log(data);
-                    // console.log(data.stocks.length);
-
-                    // Clear previous results
                     searchResults.innerHTML = '';
 
                     // Loop through each stock and display its symbol and shortname

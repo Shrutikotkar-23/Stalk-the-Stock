@@ -136,6 +136,45 @@
 
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 
+
+
+
+
+<script>
+    function addwatchlist() {
+        var watchquery = "{{ query|escapejs }}";
+        if (watchquery !== "") {
+           fetch(`/api/addtowatchlist/${watchquery}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error("Network response was not ok");
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log(data);
+                    var alert = document.getElementById("alert-2");
+
+                    if (data["response"] === "Already Exists") {
+                        console.log("Already");
+                        document.getElementById("alert-text").textContent = "Already Exists in your Watchlist.";
+                        alert.classList.remove('hidden');
+                    } else {
+                        document.getElementById("alert-text").textContent = "Added to your Watchlist.";
+                        alert.classList.remove('hidden');
+                        alert.classList.remove("dark:text-red-400", "text-red-400");
+                        alert.classList.add("dark:text-green-400");
+                        // Refresh the watchlist immediately
+                        fetchData();
+                    }
+                })
+                .catch(error => {
+                    console.error("There was a problem with the fetch operation:", error);
+                });
+        }
+    }
+</script>
+<!-- 
 <script>
     function addwatchlist() {
         var watchquery = "{{ query|escapejs }}";
@@ -167,7 +206,9 @@
                 });
         }
     }
-</script>
+</script> -->
+
+
 
 <script>
     function fetchData() {

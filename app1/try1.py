@@ -10,9 +10,6 @@ data = response.json()
 
 print(data)
 
-#print(data["chart"]["result"][0]["indicators"]["quote"][0]["close"])
-#print(data["chart"]["result"][0]["timestamp"])
-
 store={"date":[],"close":[]}
 
 for i in range(0,len(data["chart"]["result"][0]["timestamp"])):

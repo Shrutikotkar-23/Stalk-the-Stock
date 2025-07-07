@@ -15,11 +15,9 @@ def home(request):
     return HttpResponse("Hello World!!")
 
 
-
 def signup(request):
     data={"isusername":"hidden","isemail":"hidden"}
     return render(request,"login/signup.html",data)
-
 
 
 def user_login(request):
@@ -50,7 +48,6 @@ def user_login(request):
     
     data={"isusername":"hidden","ispasswordcorrect":"hidden"}
     return render(request,"login/login.html",data)
-
 
 
 def createuser(request):
@@ -101,7 +98,6 @@ def logout(request):
 
 
 
-
 def user_a(request):
     if request.user.is_authenticated:
         user = request.user
@@ -112,10 +108,6 @@ def user_a(request):
         for i in stockname:
             stock.append(i)
             price.append(user.stockbuy[i]["boughtat"] * user.stockbuy[i]["quantity"])
-
-        # watchlistsymbols = ""
-        # for i in user.watchlist["symbol"]:
-        #     watchlistsymbols = i + "," + watchlistsymbols
 
         watchlistsymbols = ",".join(user.watchlist.get("symbol", []))
 
@@ -135,6 +127,7 @@ def user_a(request):
 
 
         return data
+        print("Dashboard symbols:", user.watchlist["symbol"])
 
 
 
@@ -146,8 +139,6 @@ def dashboard(request):
         return render(request,"main/dashboard.html",data)
     else:
         return redirect("login")
-
-
 
 
 def stockdetails(request,query):
@@ -173,9 +164,7 @@ def stockdetails(request,query):
             
         
         print("Yes")
-        user=request.user
-        # print(user.watchlist["symbol"])
-        
+        user=request.user        
         watchlistsymbols = ",".join(user.watchlist.get("symbol", []))
 
 
@@ -196,16 +185,15 @@ def stockdetails(request,query):
     else:
         return redirect("login")
 
+
 def removewatchlist(request,symbol):
-    # print(symbol)
+
     user = request.user
 
     user.watchlist["symbol"].remove(symbol)
 
     user.save()
     return redirect("dashboard")
-
-
 
 
 def updatestocks(request):
@@ -265,92 +253,39 @@ def updatestocks(request):
 
 
 
-
-# def user_portfolio(request):
-
-#     if request.user.is_authenticated:
-#         user = request.user
-
-#         stockname=user.stockbuy.keys()
-#         stock=[]
-#         price=[]
-#         for i in stockname:
-#             stock.append(i)
-#             price.append(user.stockbuy[i]["boughtat"]*user.stockbuy[i]["quantity"])
-#         print("Yes")
-#         user=request.user
-#         print(user)
-#         print(user.watchlist)
-#         watchlistsymbols = ",".join(user.watchlist.get("symbol", []))
-
-#         # print(watchlistsymbols)
-#         data={
-#             "username":user.username,
-#             "name":user.firstname,
-#             "email":user.email,
-#             "totalbalance":round(user.balance,2),
-#             "watchlist": json.dumps(watchlistsymbols), 
-#             "stock":stock,
-#             "price":price,
-#             "start":today()-70000,
-#             "end":today(),
-#             "currentlyholding":"hidden",
-#         }
-#         return render(request,"main/portfolio.html",data)
-#     else:
-#         return redirect("login")
-
 def user_portfolio(request):
+
     if request.user.is_authenticated:
         user = request.user
 
-        stockname = user.stockbuy.keys()
-        stock = []
-        price = []
-
-        total_invested = 0
-        current_value = 0
-
-        for symbol in stockname:
-            data = user.stockbuy[symbol]
-            invested = data["boughtat"] * data["quantity"]
-            total_invested += invested
-            stock.append(symbol)
-            price.append(round(invested, 2))
-
-            try:
-                ticker = yf.Ticker(symbol)
-                live_price = ticker.fast_info.get("last_price", 0)
-                if not live_price:
-                    live_price = ticker.history(period="1d")["Close"].iloc[-1]
-                current_value += live_price * data["quantity"]
-            except Exception as e:
-                print(f"Error fetching live price for {symbol}: {e}")
-
-        profit_loss = round(current_value - total_invested, 2)
-
+        stockname=user.stockbuy.keys()
+        stock=[]
+        price=[]
+        for i in stockname:
+            stock.append(i)
+            price.append(user.stockbuy[i]["boughtat"]*user.stockbuy[i]["quantity"])
+        print("Yes")
+        user=request.user
+        print(user)
+        print(user.watchlist)
         watchlistsymbols = ",".join(user.watchlist.get("symbol", []))
 
-        data = {
-            "username": user.username,
-            "name": user.firstname,
-            "email": user.email,
-            "totalbalance": round(user.balance, 2),  # ✅ JUST the wallet cash
-            "profit_loss": profit_loss,
+        # print(watchlistsymbols)
+        data={
+            "username":user.username,
+            "name":user.firstname,
+            "email":user.email,
+            "totalbalance":round(user.balance,2),
             "watchlist": json.dumps(watchlistsymbols), 
-            "stock": stock,
-            "price": price,
-            "start": today() - 70000,
-            "end": today(),
-            "currentlyholding": "hidden",
+            "stock":stock,
+            "price":price,
+            "start":today()-70000,
+            "end":today(),
+            "currentlyholding":"hidden",
         }
-
-        return render(request, "main/portfolio.html", data)
+        return render(request,"main/portfolio.html",data)
     else:
         return redirect("login")
-
-
-
 
 def errorpage(request):
     if request.user.is_authenticated:
@@ -366,12 +301,7 @@ def errorpage(request):
         user=request.user
         print(user)
         print(user.watchlist)
-        # watchlistsymbols=""
-        # for i in user.watchlist["symbol"]:
-        #     watchlistsymbols=i+","+watchlistsymbols
         watchlistsymbols = ",".join(user.watchlist.get("symbol", []))
-
-        # print(watchlistsymbols)
         data={
             "username":user.username,
             "name":user.firstname,
@@ -384,7 +314,6 @@ def errorpage(request):
         return render(request,"main/error.html",data)
     else:
         return redirect("login")
-
 
 
 def settings(request):
@@ -419,42 +348,48 @@ def settings(request):
     return render(request,"main/settings.html",data)
 
 
+from datetime import datetime, timedelta
 
 def portfolio_data(request):
-    user = request.user
-    stockbuy = user.stockbuy
-    result = []
+    if request.user.is_authenticated:
+        user = request.user
+        portfolio = []
 
-    for symbol, details in stockbuy.items():
-        quantity = details.get("quantity", 0)
-        averageprice = details.get("averageprice", details.get("boughtat", 0))
+        print(f"Stock symbols for income calculation: {','.join(user.stockbuy.keys())}")
 
-        try:
-            ticker = yf.Ticker(symbol)
+        for symbol, info in user.stockbuy.items():
+            quantity = info.get("quantity", 0)
+            average_price = round(info.get("averageprice", 0), 2)
 
-            # ✅ Get last live price safely
-            live_price = None
+            try:
+                ticker = yf.Ticker(symbol)
 
-            if ticker.fast_info and "last_price" in ticker.fast_info:
-                live_price = ticker.fast_info["last_price"]
-            if live_price is None:
-                live_price = ticker.history(period="1d")["Close"].iloc[-1]
+                # Get the most recent data (use 1m if markets open, else 1d)
+                hist = ticker.history(period="1d", interval="1m")  # Minute-level
 
-        except Exception as e:
-            print(f"Error fetching {symbol} live price: {e}")
-            live_price = 0
+                if hist.empty:
+                    raise ValueError("No historical data")
 
-        change = round(live_price - averageprice, 2)
-        currentvalue = round(live_price * quantity, 2)
+                # Get last row's close value
+                current_price = round(hist['Close'].iloc[-1], 2)
+                change = round(current_price - average_price, 2)
 
-        result.append({
-            "symbol": [symbol],
-            "quantity": [quantity],
-            "averageprice": round(averageprice, 2),
-            "currentprice": round(live_price, 2),
-            "currentvalue": round(currentvalue, 2),
-            "change": round(change, 2),
-        })
+                portfolio.append({
+                    "symbol": [symbol],
+                    "quantity": [quantity],
+                    "averageprice": average_price,
+                    "currentprice": current_price,
+                    "change": change
+                })
 
-    print("PORTFOLIO JSON RESULT:", json.dumps(result, indent=2))
-    return JsonResponse(result, safe=False)
+                print(f"✅ FINAL: {symbol} | Qty: {quantity} | Avg: {average_price} | Live: {current_price} | Δ: {change}")
+
+            except Exception as e:
+                print(f"❌ Error loading {symbol}: {e}")
+                continue
+
+        return JsonResponse(portfolio, safe=False)
+
+    return JsonResponse({"error": "Unauthorized"}, status=401)
+
+

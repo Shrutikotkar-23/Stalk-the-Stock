@@ -21,11 +21,9 @@ urlpatterns = [
     path('api/addtowatchlist/<str:query>',addtoWatchlist,name="addtoWatchlist"),
     path('api/fetchdetails/<str:query>',fetchdetails,name="fetchdetails"),
     path('api/graphdata/<str:query>/<str:start>/<str:end>',graphdata,name="graphdata"),
-    # path('api/portfolio',portfolio,name="portfolio"),
     path('api/portfoliochart',portfoliochart,name="portfoliochart"),
     path('api/incomecalculate',income,name="income"),
     path('api/holdings/<str:query>',holdings,name="holdings"),
     path('api/portfolio', portfolio_data, name="portfolio"),
-#     path('api/portfolio', views.portfolio_data, name='portfolio_data'),
-
+ 
 ]

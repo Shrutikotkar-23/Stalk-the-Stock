@@ -103,76 +103,7 @@
         });
 
 </script>
-<!-- <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        fetch(`/api/portfolio`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                const tableBody = document.getElementById('stock-table-body');
 
-                data.forEach(stock => {
-                    const row = document.createElement('tr');
-                    row.className = 'bg-white border-b dark:bg-gray-800 dark:border-gray-700';
-
-                    const symbolCell = document.createElement('th');
-                    symbolCell.className = 'px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white';
-                    symbolCell.textContent = stock.symbol[0]; // Assuming symbol is always a list with one element
-
-                    const quantityCell = document.createElement('td');
-                    quantityCell.className = 'px-6 py-4';
-                    quantityCell.textContent = stock.quantity[0]; // Assuming quantity is always a list with one element
-
-                    const boughtAtCell = document.createElement('td');
-                    boughtAtCell.className = 'px-6 py-4';
-                    boughtAtCell.textContent = stock.boughtat[0]; // Assuming boughtat is always a list with one element
-
-                    const averagePriceCell = document.createElement('td');
-                    averagePriceCell.className = 'px-6 py-4';
-                    averagePriceCell.textContent = stock.averageprice[0]; // Assuming averageprice is always a list with one element
-
-                    const currentPriceCell = document.createElement('td');
-                    currentPriceCell.className = 'px-6 py-4';
-                    currentPriceCell.textContent = stock.currentprice;
-
-                    const percentChangeCell = document.createElement('td');
-                    percentChangeCell.className = 'px-6 py-4';
-                    if (stock.percentchange > 0) {
-                        percentChangeCell.classList.add("text-green-500")
-                    }
-                    else {
-                        percentChangeCell.classList.add("text-red-600")
-                    }
-                    percentChangeCell.textContent = stock.percentchange;
-
-                    const actionsCell = document.createElement('td');
-                    actionsCell.className = 'px-6 py-4';
-                    const editLink = document.createElement('a');
-                    editLink.href = 'details/' + stock.symbol;
-                    editLink.className = 'font-medium text-blue-600 dark:text-blue-500 hover:underline';
-                    editLink.textContent = 'Edit';
-                    actionsCell.appendChild(editLink);
-
-                    row.appendChild(symbolCell);
-                    row.appendChild(quantityCell);
-                    row.appendChild(boughtAtCell);
-                    row.appendChild(averagePriceCell);
-                    row.appendChild(currentPriceCell);
-                    row.appendChild(percentChangeCell);
-                    row.appendChild(actionsCell);
-
-                    tableBody.appendChild(row);
-                });
-            })
-            .catch(error => {
-                console.error('There was a problem with the fetch operation:', error);
-            });
-    });
-</script> -->
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     fetch(`/api/portfolio`)
@@ -181,6 +112,8 @@ document.addEventListener('DOMContentLoaded', function () {
             return response.json();
         })
         .then(data => {
+            console.log("Portfolio data received:", data);
+
             const tableBody = document.getElementById('stock-table-body');
 
             data.forEach(stock => {
@@ -363,7 +296,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <div class="w-full h-full bg-white rounded-lg shadow dark:bg-gray-800">
             <div class="flex justify-between p-4 md:p-6 pb-0 md:pb-0">
                 <div>
-                    <h5 class="leading-none text-3xl font-bold text-gray-900 dark:text-white pb-2">${{totalbalance}}
+                    <h5 class="leading-none text-3xl font-bold text-gray-900 dark:text-white pb-2">
                     </h5>
                     <p class="text-base font-normal text-gray-500 dark:text-gray-400"></p>
                 </div>

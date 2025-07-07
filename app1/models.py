@@ -12,7 +12,6 @@ class users(AbstractUser):
     balance=models.FloatField(default=10000.0)
     stockbuy=models.JSONField(default=dict)
     stocksold=models.JSONField(default=dict)
-    # watchlist=models.JSONField(default=list)
     watchlist = models.JSONField(default=lambda: {"symbol": []})
     cache=models.JSONField(default=list)
 

@@ -22,7 +22,6 @@ def search(request,query):
     return JsonResponse(store)
 
 
-
 def watchlist(request, query):
 
     response_step1 = requests.get("https://fc.yahoo.com")
@@ -57,10 +56,6 @@ def watchlist(request, query):
 
     return JsonResponse(store)
 
-    
-
-# Example usage:
-# watchlist("e", "aapl,goog,meta,msft,sony")
 
 def fetchdetails(request, query):
     url="https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/"+query+"?merge=false&padTimeSeries=true&period1=1698240600&period2=1714055399&type=quarterlyMarketCap%2CtrailingMarketCap%2CquarterlyEnterpriseValue%2CtrailingEnterpriseValue%2CquarterlyPeRatio%2CtrailingPeRatio%2CquarterlyForwardPeRatio%2CtrailingForwardPeRatio%2CquarterlyPegRatio%2CtrailingPegRatio%2CquarterlyPsRatio%2CtrailingPsRatio%2CquarterlyPbRatio%2CtrailingPbRatio%2CquarterlyEnterprisesValueRevenueRatio%2CtrailingEnterprisesValueRevenueRatio%2CquarterlyEnterprisesValueEBITDARatio%2CtrailingEnterprisesValueEBITDARatio&lang=en-US&region=US"
@@ -77,71 +72,42 @@ def fetchdetails(request, query):
     return JsonResponse(store)
 
 
-
-
-def graphdata(request,query,start,end):
-    url="https://query2.finance.yahoo.com/v8/finance/chart/"+query+"?period1="+str(start)+"&period2="+str(end)+"&interval=5m&includePrePost=true&events=div%7Csplit%7Cearn&&lang=en-US&region=US"
-    headers={"User-Agent": "Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"}
+def graphdata(request, query, start, end):
+    url = f"https://query2.finance.yahoo.com/v8/finance/chart/{query}?period1={start}&period2={end}&interval=1d&includePrePost=true&events=div%7Csplit%7Cearn&&lang=en-US&region=US"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
+    }
     print(url)
-    response = requests.get(url,headers=headers)
+    
+    response = requests.get(url, headers=headers)
     data = response.json()
 
-    store={"date":[],"close":[]}
+    store = {"date": [], "close": []}
 
-    for i in range(0,len(data["chart"]["result"][0]["timestamp"])):
-        store["date"].append(getdate(data["chart"]["result"][0]["timestamp"][i]))
-        try:
-            store["close"].append(round(data["chart"]["result"][0]["indicators"]["quote"][0]["close"][i],2))
-        except:
-            continue
-    
-    store["currency"]=data["chart"]["result"][0]["meta"]["currency"]
-    return JsonResponse(store)
+    try:
+        timestamps = data["chart"]["result"][0].get("timestamp", [])
+        closes = data["chart"]["result"][0]["indicators"]["quote"][0].get("close", [])
 
-    stocks=user.stockbuy
-    name=list(stocks.keys())
-    print(name[0])
-    print(name)
-    stocksname=""
-    for i in range(len(name)-1,-1,-1):
-        print(i)
-        stocksname=name[i]+","+stocksname
-    print(stocksname)
-    store=[]
-    i=0
-    url="http://127.0.0.1:8000/api/watchlist/"+stocksname
-    headers={"User-Agent": "Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"}
-    response = requests.get(url,headers=headers)
-    data = response.json()
-    for i in range(0,len(name)):
-        store.append({"symbol":[name[i]],"quantity":[stocks[name[i]]["quantity"]],"boughtat":[stocks[name[i]]["boughtat"]],"averageprice":[stocks[name[i]]["averageprice"]],"currentprice":data["stocks"][i][1],"percentchange":data["stocks"][i][2]})
+        for i in range(len(timestamps)):
+            store["date"].append(getdate(timestamps[i]))
+            try:
+                if closes[i] is not None:
+                    store["close"].append(round(closes[i], 2))
+            except:
+                continue
 
-    print(data["stocks"])
-    print(store)
-    
-    return JsonResponse(store,safe=False)
+        store["currency"] = data["chart"]["result"][0]["meta"].get("currency", "USD")
+        return JsonResponse(store)
 
+    except Exception as e:
+        print("Error fetching chart data:", e)
+        return JsonResponse({
+            "date": [],
+            "close": [],
+            "currency": "USD",
+            "error": f"Data not available for {query}"
+        })
 
-
-
-# def portfoliochart(request):
-#     user = request.user
-
-#     stocks = user.stockbuy
-#     price = []
-#     name = []
-
-#     if isinstance(stocks, dict):  # check it's a dict
-#         for symbol, data in stocks.items():
-#             try:
-#                 amount = data.get("boughtat", 0) * data.get("quantity", 0)
-#                 if amount > 0:
-#                     name.append(symbol)
-#                     price.append(round(amount, 2))
-#             except Exception as e:
-#                 print("Error for stock:", symbol, e)
-
-#     return JsonResponse({"name": name, "price": price})
 
 def portfoliochart(request):
     user = request.user
@@ -226,17 +192,16 @@ def holdings(request, query):
     })
     
 
-
-def addtoWatchlist(request,query):
-    logedInUser=request.user
-
-    watchlist=logedInUser.watchlist
-    print(watchlist)
-    print(query)
-    if(query in watchlist["symbol"]):
-        print("Already Exists")
-        return JsonResponse({"response":"Already Exists"})
+def addtoWatchlist(request, query):
+    user = request.user
+    watchlist = user.watchlist
+    
+    if query in watchlist["symbol"]:
+        return JsonResponse({"response": "Already Exists", "watchlist": watchlist["symbol"]})
     else:
         watchlist["symbol"].append(query)
-        logedInUser.save()
-        return JsonResponse({"response":"Added "+query})
+        user.save()
+        # Return the full updated watchlist
+        return JsonResponse({"response": "Added " + query, "watchlist": watchlist["symbol"]})
+
+
