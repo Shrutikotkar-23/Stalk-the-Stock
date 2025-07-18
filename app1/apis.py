@@ -185,7 +185,12 @@ def portfolio(request):
 
     stocksname = ",".join(symbols)
 
-    url = f"http://127.0.0.1:8000/api/watchlist/{stocksname}"
+    import os
+
+    # Use env variable if set, otherwise fallback to your deployed URL
+    base_url = os.environ.get("BACKEND_URL", "https://stalk-the-stock-django.onrender.com")
+    url = f"{base_url}/api/watchlist/{stocksname}"
+
     headers = {
         "User-Agent": "Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
     }
@@ -236,7 +241,12 @@ def income(request):
     stocks_query = ",".join(reversed(symbols))
     print("Fetching data for symbols:", stocks_query)
 
-    url = f"http://127.0.0.1:8000/api/watchlist/{stocks_query}"
+    import os
+
+    # Use environment variable or default to Render URL
+    base_url = os.environ.get("BACKEND_URL", "https://stalk-the-stock-django.onrender.com")
+    url = f"{base_url}/api/watchlist/{stocks_query}"
+
     headers = {
         "User-Agent": "Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
     }
