@@ -2,10 +2,14 @@ services:
   - type: web
     name: stalk-the-stock
     env: python
-    buildCommand: pip install -r requirements.txt | python manage.py collectstatic --noinput
-    startCommand: gunicorn demostocks.wsgi:application
+    plan: free
+    buildCommand: |
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput
+      python manage.py migrate
+    startCommand: gunicorn demostocks.wsgi:application --preload
     envVars:
-      - key: DJANGO_SETTINGS_MODULE
-        value: demostocks.settings
-      - key: PYTHON_VERSION
-        value: 3.11
+      - key: DEBUG
+        value: False
+      - key: SECRET_KEY
+        generateValue: true
