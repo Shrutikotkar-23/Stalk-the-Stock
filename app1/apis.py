@@ -25,7 +25,7 @@ def search(request, query):
     }
 
     try:
-        response = requests.get(url, headers=headers, timeout=1)  # ⏱ Short timeout
+        response = requests.get(url, headers=headers, timeout=10)  # ⏱ Short timeout
         response.raise_for_status()
         data = response.json()
     except requests.RequestException:
@@ -82,7 +82,7 @@ def fetch_yahoo_quotes(symbols):
     }
 
     try:
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         data = response.json()
     except requests.RequestException as e:
