@@ -1,0 +1,499 @@
+{% extends 'main/dashboardbase.html' %}
+
+{% block dashboard %}
+
+{% load static %}
+
+<script>
+    function fetchData() {
+        var watchquery = "{{query}}";
+        fetch(`/api/holdings/${watchquery}`)  // Using backticks for template literal
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log(data);
+                const currentlyholding = document.getElementById("currentlyholding");
+                if (currentlyholding) {
+                    currentlyholding.innerHTML = data.quantity || 0;
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching holdings data:', error);
+                // Optional: Show user-friendly error message
+                const errorElement = document.getElementById("holdings-error");
+                if (errorElement) {
+                    errorElement.textContent = "Failed to load holdings data";
+                    errorElement.classList.remove("hidden");
+                }
+            });
+    }
+
+    // Call immediately and then every 100ms
+    fetchData();
+    const intervalId = setInterval(fetchData, 5000);
+
+    // Consider adding cleanup if needed
+    // window.addEventListener('beforeunload', () => clearInterval(intervalId));
+</script>
+
+<div class="bg-gray-900 border-gray-200 dark:bg-gray-900">
+    <div class="flex flex-col md:flex-row">
+        <div class="flex-1">
+            <div class="mx-4 my-4 bg-gray-900 rounded-lg shadow dark:bg-gray-800 p-4 md:p-6">
+                <div class="flex justify-between">
+                    <div>
+                        <h5 id="currentPrice"
+                            class="leading-none text-3xl font-bold text-gray-900 dark:text-white pb-2">Current Price:
+                        </h5>
+                        <p class="text-base font-normal text-gray-500 dark:text-gray-400">Price Chart</p>
+                    </div>
+                    <div>
+                        <h5 id="previousPrice"
+                            class="leading-none text-3xl font-bold text-gray-900 dark:text-white pb-2">Previous Close:
+                            ${{previousclose}}</h5>
+                    </div>
+                    <div id="changePercentage"
+                        class="flex items-center px-2.5 py-0.5 text-base font-semibold text-green-500 text-center">
+                        %
+                        <svg class="w-3 h-3 ms-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 10 14">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M5 13V1m0 0L1 5m4-4 4 4" />
+                        </svg>
+                    </div>
+                </div>
+                <div id="labels-chart" class="px-2.5"></div>
+            </div>
+        </div>
+        
+        <div class="flex-3 pt-4">
+            <div class="flex flex-col">
+                <button type="submit" name="addtowatchlist" onclick="addwatchlist()"
+                    class="text-white bg-[#2557D6] hover:bg-[#2557D6]/90 focus:ring-4 focus:ring-[#2557D6]/50 focus:outline-none font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center dark:focus:ring-[#2557D6]/50 me-2 mb-2 justify-center">
+                    Add to WatchList
+                </button>
+                
+                <!-- Funds Warning Popup -->
+                <div id="funds-warning-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 transition-opacity duration-300 ease-in-out">
+                    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+                        <div class="mt-3 text-center">
+                            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 dark:bg-yellow-900">
+                                <svg class="h-6 w-6 text-yellow-600 dark:text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white mt-2">Warning</h3>
+                            <div class="mt-2 px-7 py-3">
+                                <p class="text-sm text-gray-500 dark:text-gray-300" id="funds-warning-text"></p>
+                            </div>
+                            <div class="items-center px-4 py-3">
+                                <button id="funds-warning-ok-btn"
+                                        class="px-4 py-2 bg-yellow-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-300">
+                                    OK
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto shadow-md sm:rounded-lg">
+                    <table class="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+                        <tbody>
+                            {% for key, value in data.items %}
+                            <tr class="border-b border-gray-200 dark:border-gray-700">
+                                <th scope="row"
+                                    class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap bg-gray-50 dark:text-white dark:bg-gray-800">
+                                    {{key}}
+                                </th>
+                                <td class="px-6 py-4">
+                                    {{value}}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <form id="updatestocksform" action="{% url 'updatestocks' %}" method="post">
+                    {% csrf_token %}
+                    <div class="flex flex-row justify-center pt-2">
+                        <div class="max-w-xs mx-auto">
+                            <label for="quantity-input"
+                                class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Choose quantity:</label>
+                            <div class="relative flex items-center max-w-[8rem]">
+                                <button type="button" id="decrement-button"
+                                    class="bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 dark:border-gray-600 hover:bg-gray-200 border border-gray-300 rounded-s-lg p-3 h-11 focus:ring-gray-100 dark:focus:ring-gray-700 focus:ring-2 focus:outline-none">
+                                    <svg class="w-3 h-3 text-gray-900 dark:text-white" aria-hidden="true"
+                                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 18 2">
+                                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                            stroke-width="2" d="M1 1h16" />
+                                    </svg>
+                                </button>
+                                <input type="text" id="symbolname" name="symbolname" class="hidden" value="{{query}}">
+                                <input type="text" id="currentprice" name="currentprice" class="hidden" value="">
+                                <input type="text" id="quantity-input" name="quantity-input"
+                                    class="bg-gray-50 border-x-0 border-gray-300 h-11 text-center text-gray-900 text-sm focus:ring-blue-500 focus:border-blue-500 block w-full py-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                                    placeholder="0" required value="0" />
+                                <button type="button" id="increment-button"
+                                    class="bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 dark:border-gray-600 hover:bg-gray-200 border border-gray-300 rounded-e-lg p-3 h-11 focus:ring-gray-100 dark:focus:ring-gray-700 focus:ring-2 focus:outline-none">
+                                    <svg class="w-3 h-3 text-gray-900 dark:text-white" aria-hidden="true"
+                                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 18 18">
+                                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                            stroke-width="2" d="M9 1v16M1 9h16" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                                Estimated cost: $<span id="estimated-cost">0.00</span>
+                            </div>
+                            <p id="helper-text-explanation" class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                                Please select quantity to Buy/Sell.
+                            </p>
+                        </div>
+                        <div class="flex flex-col justify-center pl-2">
+                            <button type="submit" name="buy" value="buy"
+                                class="focus:outline-none text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-xl px-8 py-2.5 me-2 mb-2 dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Buy
+                            </button>
+                            <button type="submit" name="sell" value="sell"
+                                class="focus:outline-none text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-xl px-8 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Sell
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function fetchData() {
+        var watchquery = "{{query}}";
+        console.log("marketstatus check"); 
+        fetch(`/api/watchlist/${watchquery}`)  // Fixed: Using backticks for template literal
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("marketstatus check 2 - Data received:", data); 
+                
+                var currentPriceElement = document.getElementById('currentPrice');
+                var changepercentage = document.getElementById('changePercentage');
+                var marketStatusElement = document.getElementById('marketstatus'); // Make sure this element exists
+                var currentPriceInput = document.getElementById('currentprice'); // Make sure this matches your HTML
+
+                if (data && data.stocks && data.stocks.length > 0) {
+                    var stockData = data.stocks[0];
+                    var currentPrice = stockData[1];
+                    var changeper = stockData[2];
+                    var market = stockData[4];
+
+                    // Update current price display
+                    if (currentPriceElement) {
+                        currentPriceElement.textContent = "Current Price: $" + currentPrice;
+                    }
+
+                    // Update change percentage
+                    if (changepercentage) {
+                        changepercentage.textContent = changeper + " %";
+                        // Reset classes first
+                        changepercentage.classList.remove('dark:text-green-500', 'dark:text-red-500');
+                        // Add appropriate class
+                        if (changeper > 0) {
+                            changepercentage.classList.add('dark:text-green-500');
+                        } else {
+                            changepercentage.classList.add('dark:text-red-500');
+                        }
+                    }
+
+                    // Update market status
+                    if (marketStatusElement) {
+                        marketStatusElement.innerHTML = market;
+                    }
+
+                    // Update hidden input field
+                    if (currentPriceInput) {
+                        currentPriceInput.value = currentPrice;
+                    }
+                } else {
+                    console.error('No stock data received');
+                }
+            })
+            .catch(error => {
+                console.error('There was a problem with the fetch operation:', error);
+            });
+    }
+
+    // Call immediately
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchData();
+        // Set up interval
+        setInterval(fetchData, 5000);
+    });
+</script>
+
+<script>
+    function addwatchlist(){
+        var watchquery = "{{query}}";
+        console.log(watchquery) ; 
+        fetch(`/api/addtowatchlist/${watchquery}`).then(response => {
+            if(!response.ok){
+                throw new Error("Network response was not ok");
+            }
+            return response.json();
+        })
+        .then(data => {
+
+            console.log(data)
+
+            var modal = document.getElementById("funds-warning-modal")
+            var modalText = document.getElementById("funds-warning-text")
+            
+            if(data["response"]=="Already Exists"){
+                modalText.textContent = "Already Exists in your Watchlist.";
+            }
+            else{
+                modalText.textContent = "Added to your Watchlist";
+            }
+            
+            // Show the modal
+            modal.classList.remove('hidden');
+            
+            // Add event listener for OK button
+            document.getElementById("funds-warning-ok-btn").addEventListener("click", function() {
+                modal.classList.add('hidden');
+            });
+        })
+        .catch(error => {
+            console.error('There was a problem with the fetch operation:', error);
+        });
+    }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    let userBalance = 0;
+    let currentStockPrice = 0;
+    let userHoldings = {}; // Structure: { stocks: { stockName: { quantity: ... } } }
+
+    async function fetchUserBalance() {
+        try {
+            const response = await fetch('/api/userbalance');
+            if (!response.ok) throw new Error('Network response was not ok');
+            const data = await response.json();
+            userBalance = data.balance;
+            userHoldings = data.stockbuy || {};
+            console.log("User balance:", userBalance);
+            console.log("User holdings:", userHoldings);
+        } catch (error) {
+            console.error('Error fetching user balance:', error);
+        }
+    }
+
+    function updateEstimatedCost() {
+        const quantityInput = document.getElementById('quantity-input');
+        const estimatedCostElement = document.getElementById('estimated-cost');
+        const buyButton = document.querySelector('button[name="buy"]');
+
+        if (!quantityInput || !estimatedCostElement || !buyButton) return;
+
+        const quantity = parseInt(quantityInput.value) || 0;
+        const estimatedCost = quantity * currentStockPrice;
+        estimatedCostElement.textContent = estimatedCost.toFixed(2);
+
+        buyButton.disabled = quantity <= 0;
+    }
+
+    function fetchData() {
+        const watchquery = "{{query}}";
+        fetch(`/api/watchlist/${watchquery}`)
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            })
+            .then(data => {
+                const currentPriceElement = document.getElementById('currentPrice');
+                const changePercentage = document.getElementById('changePercentage');
+                const currentPriceInput = document.getElementById("currentprice");
+
+                if (!currentPriceElement || !changePercentage || !currentPriceInput) return;
+
+                const stocks = data.stocks;
+                if (stocks && stocks.length > 0) {
+                    currentStockPrice = stocks[0][1];
+                    currentPriceElement.textContent = "Current Price: $" + currentStockPrice;
+                    currentPriceInput.value = currentStockPrice;
+
+                    const changeper = stocks[0][2];
+                    if (changeper > 0) {
+                        changePercentage.classList.add('dark:text-green-500');
+                        changePercentage.classList.remove('dark:text-red-500');
+                    } else {
+                        changePercentage.classList.add('dark:text-red-500');
+                        changePercentage.classList.remove('dark:text-green-500');
+                    }
+                    changePercentage.textContent = changeper + " %";
+
+                    updateEstimatedCost();
+                }
+            })
+            .catch(error => console.error('Fetch error:', error));
+    }
+
+    // Setup event listeners and initialize
+    fetchUserBalance();
+    fetchData();
+    setInterval(fetchData, 5000);
+
+    const quantityInput = document.getElementById('quantity-input');
+    const incrementButton = document.getElementById('increment-button');
+    const decrementButton = document.getElementById('decrement-button');
+    const warningModal = document.getElementById('funds-warning-modal');
+    const warningText = document.getElementById('funds-warning-text');
+    const warningOkBtn = document.getElementById('funds-warning-ok-btn');
+    const buyButton = document.querySelector('button[name="buy"]');
+    const sellButton = document.querySelector('button[name="sell"]');
+    const updateStocksForm = document.getElementById('updatestocksform');
+
+    if (quantityInput && incrementButton && decrementButton && warningModal && warningText && warningOkBtn && buyButton && sellButton && updateStocksForm) {
+        quantityInput.addEventListener('input', updateEstimatedCost);
+
+        incrementButton.addEventListener('click', () => {
+            quantityInput.value = (parseInt(quantityInput.value) || 0) + 1;
+            updateEstimatedCost();
+        });
+
+        decrementButton.addEventListener('click', () => {
+            quantityInput.value = Math.max(0, (parseInt(quantityInput.value) || 0) - 1);
+            updateEstimatedCost();
+        });
+
+        warningOkBtn.addEventListener('click', () => {
+            warningModal.classList.add('hidden');
+        });
+
+        updateStocksForm.addEventListener('submit', function (e) {
+            const quantity = parseInt(quantityInput.value) || 0;
+            const totalCost = quantity * currentStockPrice;
+            const stockName = "{{query}}";
+
+            if (document.activeElement.name === "buy") {
+                if (totalCost > userBalance) {
+                    e.preventDefault();
+                    warningText.textContent = `This order requires $${totalCost.toFixed(2)} but you only have $${userBalance.toFixed(2)} available.`;
+                    warningModal.classList.remove('hidden');
+                    return false;
+                } else if (totalCost > userBalance * 0.9) {
+                    warningText.textContent = `This order will use $${totalCost.toFixed(2)} of your $${userBalance.toFixed(2)} balance.`;
+                    warningModal.classList.remove('hidden');
+                }
+            } else if (document.activeElement.name === "sell") {
+                const stockInfo = userHoldings[stockName];
+                const userQtyHeld = stockInfo?.quantity || 0;
+
+                if (quantity > userQtyHeld) {
+                    e.preventDefault();
+                    warningText.textContent = `You are trying to sell ${quantity} shares, but you only own ${userQtyHeld}.`;
+                    warningModal.classList.remove('hidden');
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }
+
+    // Fetch and render ApexCharts graph
+    const start = "{{start|escapejs}}";
+    const end = "{{end|escapejs}}";
+
+    fetch(`/api/graphdata/{{query}}/${start}/${end}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            if (!data || !data.date || !data.close) {
+                console.error('Invalid graph data');
+                return;
+            }
+            const options = {
+                xaxis: {
+                    categories: data.date,
+                    labels: {
+                        show: true,
+                        style: {
+                            fontFamily: "Inter, sans-serif",
+                            cssClass: 'text-xs font-normal fill-gray-500 dark:fill-gray-400'
+                        }
+                    },
+                    axisBorder: { show: false },
+                    axisTicks: { show: false },
+                    tickAmount: Math.ceil(data.date.length / 50),
+                },
+                yaxis: {
+                    labels: {
+                        show: true,
+                        style: {
+                            fontFamily: "Inter, sans-serif",
+                            cssClass: 'text-xs font-normal fill-gray-500 dark:fill-gray-400'
+                        },
+                        formatter: value => '$ ' + value
+                    }
+                },
+                series: [{
+                    name: "Close Price",
+                    data: data.close,
+                    color: "#1A56DB",
+                }],
+                chart: {
+                    height: "250%",
+                    width: "100%",
+                    type: "area",
+                    fontFamily: "Inter, sans-serif",
+                    dropShadow: { enabled: false },
+                    toolbar: { show: false },
+                },
+                tooltip: {
+                    enabled: true,
+                    x: { show: false },
+                },
+                fill: {
+                    type: "gradient",
+                    gradient: {
+                        opacityFrom: 0.55,
+                        opacityTo: 0,
+                        shade: "#1C64F2",
+                        gradientToColors: ["#1C64F2"],
+                    },
+                },
+                dataLabels: { enabled: false },
+                stroke: { width: 6 },
+                legend: { show: false },
+                grid: { show: false },
+            };
+
+            const chartContainer = document.getElementById("labels-chart");
+            if (chartContainer && typeof ApexCharts !== 'undefined') {
+                const chart = new ApexCharts(chartContainer, options);
+                chart.render();
+            }
+        })
+        .catch(error => console.error('Chart Fetch Error:', error));
+});
+</script>
+
+
+{% endblock %}

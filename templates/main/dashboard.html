@@ -1,0 +1,585 @@
+{% extends 'main/dashboardbase.html' %}
+
+{% block dashboard %}
+<script>
+    // Configuration
+    const symbol = "{{stocklist|escapejs}}";
+    const start = "{{start|escapejs}}";
+    const end = "{{end|escapejs}}";
+    const watchquery = "{{watchlist}}";
+
+    // Parse symbols
+    const symbols = JSON.parse(symbol.replace(/'/g, '"'));
+    let chart = null;
+    let selectedSymbol = null;
+    let isFetching = false;
+
+    // DOM Elements (will be initialized after DOM loads)
+    let chartContainer;
+    let priceDisplay;
+    let stocksTableBody;
+
+    // UI States
+    function showInitialState() {
+        if (!chartContainer || !priceDisplay) return;
+        
+        clearChart();
+        chartContainer.innerHTML = `
+            <div class="p-6 text-center text-gray-500 dark:text-gray-400">
+                Click on a stock from your watchlist to view its chart
+            </div>
+        `;
+        priceDisplay.textContent = "No stock selected";
+    }
+
+    function showLoadingState(symbol) {
+        if (!chartContainer || !priceDisplay) return;
+        
+        clearChart();
+        chartContainer.innerHTML = `
+            <div class="p-6 text-center text-gray-500 dark:text-gray-400">
+                Loading ${symbol} chart...
+            </div>
+        `;
+        priceDisplay.textContent = `${symbol} — Loading...`;
+    }
+
+    function showErrorState(symbol) {
+        if (!chartContainer || !priceDisplay) return;
+        
+        clearChart();
+        chartContainer.innerHTML = `
+            <div class="p-6 text-center text-red-500 dark:text-red-400">
+                No data available for ${symbol}
+            </div>
+        `;
+        priceDisplay.textContent = `${symbol} — Data unavailable`;
+    }
+
+    function clearChart() {
+        if (chart) {
+            chart.destroy();
+            chart = null;
+        }
+        if (chartContainer) {
+            chartContainer.innerHTML = '';
+        }
+    }
+
+    // Fetch data for single symbol
+    async function fetchStockData(symbol) {
+        try {
+            // Return null immediately if we shouldn't fetch
+            if (isFetching || selectedSymbol === symbol) return null;
+            
+            isFetching = true;
+            selectedSymbol = symbol;
+            showLoadingState(symbol);
+
+            // Use a silent fetch wrapper
+            const response = await fetch(`/api/graphdata/${symbol}/${start}/${end}`)
+                .catch(() => null); // This prevents the console error
+                
+            if (!response?.ok) return null;
+            
+            const data = await response.json().catch(() => null);
+            if (!data?.date?.length || !data?.close?.length) return null;
+            
+            return data;
+        } finally {
+            isFetching = false;
+        }
+    }
+
+function renderChart(symbol, data) {
+    if (!chartContainer || !priceDisplay) return;
+    
+    clearChart();
+    
+    // Convert date strings to timestamps
+    const timestamps = data.date.map(dateStr => new Date(dateStr).getTime());
+    const closes = data.close;
+    const lastClose = closes[closes.length - 1];
+    const firstClose = closes[0];
+    const trendColor = lastClose >= firstClose ? '#10B981' : '#EF4444';
+
+    const options = {
+        series: [{
+            name: symbol,
+            data: closes.map((close, index) => ({
+                x: timestamps[index],
+                y: close
+            })),
+            color: trendColor
+        }],
+        chart: {
+            height: "100%",
+            width: "100%",
+            type: "area",
+            toolbar: { show: false },
+            animations: {
+                enabled: true,
+                easing: 'easeinout',
+                speed: 800
+            },
+            // Disable the floating price label
+            events: {
+                mouseMove: function(event, chartContext, config) {
+                    // This prevents the default price label behavior
+                    return false;
+                }
+            }
+        },
+        xaxis: {
+            type: 'datetime',
+            labels: {
+                style: {
+                    fontSize: '10px',
+                    cssClass: 'font-normal fill-gray-500 dark:fill-gray-400'
+                },
+                formatter: function(value) {
+                    const date = new Date(value);
+                    const day = date.getDate();
+                    const month = date.toLocaleString('default', { month: 'short' });
+                    return `${month} ${day}`;
+                }
+            },
+            axisBorder: { show: false },
+            axisTicks: { show: false }
+        },
+        yaxis: {
+            labels: {
+                formatter: function(value) {
+                    if (value >= 1000) return '$' + (value/1000).toFixed(1) + 'K';
+                    if (value >= 100) return '$' + value.toFixed(0);
+                    return '$' + value.toFixed(2);
+                },
+                style: {
+                    fontSize: '10px',
+                    cssClass: 'font-normal fill-gray-500 dark:fill-gray-400'
+                }
+            },
+            tickAmount: 6
+        },
+        tooltip: {
+            enabled: true,
+            x: {
+                formatter: function(value) {
+                    return new Date(value).toLocaleString('en-US', {
+                        weekday: 'short',
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                }
+            },
+            y: {
+                formatter: function(value) {
+                    return '$' + value.toFixed(2);
+                },
+                title: {
+                    formatter: () => 'Price: '
+                }
+            },
+            // Ensure tooltip stays clean without the floating label
+            fixed: {
+                enabled: true,
+                position: 'topRight'
+            }
+        },
+        stroke: { 
+            width: 2,
+            curve: 'smooth'
+        },
+        fill: {
+            type: "gradient",
+            gradient: {
+                shadeIntensity: 0.5,
+                opacityFrom: 0.4,
+                opacityTo: 0.1,
+                stops: [0, 90, 100]
+            }
+        },
+        markers: {
+            size: closes.length > 50 ? 0 : 3
+        },
+        // Disable the default floating value label
+        dataLabels: {
+            enabled: false
+        }
+    };
+
+    // Update the separate price display element instead
+    const percentChange = ((lastClose - firstClose) / firstClose * 100).toFixed(2);
+    priceDisplay.innerHTML = `
+        ${symbol} — $${lastClose.toFixed(2)}
+        <span class="${lastClose >= firstClose ? 'text-green-500' : 'text-red-500'}">
+            (${percentChange}%)
+        </span>
+    `;
+
+    chart = new ApexCharts(chartContainer, options);
+    chart.render();
+}
+
+    // Handle stock selection
+    async function handleStockSelect(symbol) {
+        const data = await fetchStockData(symbol);
+        if (data) {
+            renderChart(symbol, data);
+        }
+    }
+
+    // Update watchlist table
+    async function updateWatchlist() {
+        if (!stocksTableBody) return;
+        
+        try {
+            const response = await fetch(`/api/watchlist/${watchquery}`);
+            if (!response.ok) throw new Error('Failed to fetch watchlist');
+            
+
+            const data = await response.json();
+            stocksTableBody.innerHTML = data.stocks.map(stock => {
+                const [symbol, price, change] = stock;
+                const isActive = selectedSymbol === symbol;
+                
+                return `
+                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 
+                            ${isActive ? 'bg-blue-50 dark:bg-gray-700' : ''}">
+                        <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                            <button class="symbol-button ${isActive ? 'font-bold' : ''}" 
+                                    onclick="handleStockSelect('${symbol}')">
+                                ${symbol}
+                            </button>
+                        </th>
+                        <td class="px-6 py-4">${price}</td>
+                        <td class="px-6 py-4 ${change > 0 ? 'text-green-500' : 'text-red-600'}">
+                            ${change}
+                        </td>
+                        <td class="px-2 py-4">
+                            <a href="/removewatchlist/${symbol}" 
+                            class="font-medium text-blue-600 dark:text-blue-500 hover:underline">
+                                Remove
+                            </a>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        } catch (error) {
+            console.error("Failed to update watchlist:", error);
+            if (stocksTableBody) {
+                stocksTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-6 py-4 text-center text-red-500">
+                            Failed to load watchlist
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+    }
+
+    // Call every 2 seconds
+    setInterval(updateWatchlist, 2000);
+    // Initialization
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Initialize DOM references
+        chartContainer = document.getElementById("labels-chart");
+        priceDisplay = document.getElementById("watchstockprice");
+        stocksTableBody = document.getElementById("stocksTableBody");
+        
+        if (!chartContainer || !priceDisplay || !stocksTableBody) {
+            console.error("Required DOM elements not found");
+            return;
+        }
+        
+        showInitialState();
+        await updateWatchlist();
+        
+        // Make function available globally for HTML onclick
+        window.handleStockSelect = handleStockSelect;
+    });
+</script>
+
+<style>
+  .hide-scrollbar::-webkit-scrollbar { width: 0; height: 0; }
+  .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+</style>
+
+<div class="p-4 space-y-4 border-2 border-gray-200 dark:border-gray-700">
+
+  <!-- Row 1: Watchlist + Chart -->
+  <div class="flex gap-4 w-full">
+    
+    <!-- Watchlist -->
+    <div class="flex flex-col h-96 rounded bg-gray-50 dark:bg-gray-800 overflow-hidden" style="flex: 1; min-width: 400px; max-width: 500px;">
+      <div class="px-4 py-2">
+        <h5 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Your WatchList:</h5>
+      </div>
+      <div class="flex-1 overflow-x-auto px-4 pb-4 hide-scrollbar">
+        <div class="h-full overflow-y-auto shadow-md sm:rounded-lg hide-scrollbar">
+          <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+            <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+              <tr>
+                <th class="px-6 py-3">Name</th>
+                <th class="px-6 py-3">Price</th>
+                <th class="px-6 py-3">Change</th>
+                <th class="px-2 py-3">Action</th>
+              </tr>
+            </thead>
+            <tbody id="stocksTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="flex h-96 w-full rounded bg-gray-50 dark:bg-gray-800 flex-1">
+      <div class="w-full h-full bg-white rounded-lg shadow dark:bg-gray-800 flex flex-col overflow-hidden">
+        <div class="px-4 pt-4">
+          <h5 id="watchstockprice" class="leading-none text-3xl font-bold text-gray-900 dark:text-white">--</h5>
+          <p class="text-base font-normal text-gray-500 dark:text-gray-400"></p>
+        </div>
+        <div class="flex-1 px-2.5 pb-4">
+          <div id="labels-chart" class="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400 text-lg font-medium">
+            Click on a stock to view its chart.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Row 2: Portfolio + Assets Allocation -->
+  <div class="flex gap-4 w-full">
+    
+    <!-- Portfolio -->
+    <div class="flex flex-col h-96 rounded bg-gray-50 dark:bg-gray-800 overflow-hidden flex-1">
+      <div class="px-4 py-2">
+        <h5 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Portfolio Overview:</h5>
+      </div>
+      <div class="flex-1 overflow-x-auto px-4 pb-2 hide-scrollbar">
+        <div class="h-full overflow-y-auto shadow-md sm:rounded-lg hide-scrollbar">
+          <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+            <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+              <tr>
+                <th class="px-6 py-3">Stock Name</th>
+                <th class="px-5 py-3">Share Count</th>
+                <th class="px-5 py-3">Average Price</th>
+                <th class="px-5 py-3">Current Value</th>
+                <th class="px-5 py-3">Percent Change</th>
+                <th class="px-5 py-3">Edit</th>
+              </tr>
+            </thead>
+            <tbody id="stock-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Donut Chart -->
+    <div class="flex items-center justify-center h-96 rounded bg-gray-50 dark:bg-gray-800" style="flex: 1; min-width: 400px; max-width: 500px;">
+      <div class="h-full w-full bg-white rounded-lg shadow dark:bg-gray-800 p-4 flex flex-col">
+        <h5 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Assets Allocation</h5>
+        <div class="flex-grow flex items-center justify-center" id="donut-chart"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+    <script>
+        fetch(`/api/portfoliochart`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                const getChartOptions = () => {
+                    return {
+                        series: data.price,
+                        colors: ["#1C64F2", "#16BDCA", "#FDBA8C", "#E74694"],
+                        chart: {
+                            height: 320,
+                            width: "100%",
+                            type: "donut",
+                        },
+                        stroke: {
+                            colors: ["transparent"],
+                            lineCap: "",
+                        },
+                        plotOptions: {
+                            pie: {
+                                donut: {
+                                    labels: {
+                                        show: true,
+                                        name: {
+                                            show: true,
+                                            fontFamily: "Inter, sans-serif",
+                                            offsetY: 20,
+                                        },
+                                        total: {
+                                            showAlways: true,
+                                            show: true,
+                                            label: "Total Investment",
+                                            fontFamily: "Inter, sans-serif",
+                                            formatter: function (w) {
+                                                const sum = w.globals.seriesTotals.reduce((a, b) => {
+                                                    return a + b
+                                                }, 0)
+                                                return '$' + sum
+                                            },
+                                        },
+                                        value: {
+                                            show: true,
+                                            fontFamily: "Inter, sans-serif",
+                                            offsetY: -20,
+                                            formatter: function (value) {
+                                                return value
+                                            },
+                                        },
+                                    },
+                                    size: "80%",
+                                },
+                            },
+                        },
+                        grid: {
+                            padding: {
+                                top: -2,
+                            },
+                        },
+                        labels: data.name,
+                        dataLabels: {
+                            enabled: false,
+                        },
+                        legend: {
+                            position: "bottom",
+                            fontFamily: "Inter, sans-serif",
+                        },
+                        yaxis: {
+                            labels: {
+                                formatter: function (value) {
+                                    return value
+                                },
+                            },
+                        },
+                        xaxis: {
+                            labels: {
+                                formatter: function (value) {
+                                    return value
+                                },
+                            },
+                            axisTicks: {
+                                show: false,
+                            },
+                            axisBorder: {
+                                show: false,
+                            },
+                        },
+                    }
+                }
+
+                if (document.getElementById("donut-chart") && typeof ApexCharts !== 'undefined') {
+                    const chart = new ApexCharts(document.getElementById("donut-chart"), getChartOptions());
+                    chart.render();
+                }
+            })
+            .catch(error => {
+                console.error('There was a problem with the fetch operation:', error);
+            });
+
+    </script>
+
+    <script>
+    function fetchAndRenderPortfolio() {
+        fetch(`/api/portfolio`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                const tableBody = document.getElementById('stock-table-body');
+
+                // Clear the table before adding new rows
+                tableBody.innerHTML = '';
+
+                data.forEach(stock => {
+                    const row = document.createElement('tr');
+                    row.className = 'bg-white border-b dark:bg-gray-800 dark:border-gray-700';
+
+                    // Symbol
+                    const symbolCell = document.createElement('th');
+                    symbolCell.className = 'px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white';
+                    symbolCell.textContent = stock.symbol;
+
+                    // Count (Quantity)
+                    const quantityCell = document.createElement('td');
+                    quantityCell.className = 'px-6 py-4';
+                    quantityCell.textContent = stock.quantity;
+
+                    // Average Price
+                    const averagePriceCell = document.createElement('td');
+                    averagePriceCell.className = 'px-6 py-4';
+                    averagePriceCell.textContent = parseFloat(stock.averageprice).toFixed(2);
+
+                    // Current Price
+                    const currentPriceCell = document.createElement('td');
+                    currentPriceCell.className = 'px-6 py-4';
+                    currentPriceCell.textContent = parseFloat(stock.currentprice).toFixed(2);
+
+                    // Percent Change
+                    const diff = ((parseFloat(stock.currentprice) - parseFloat(stock.averageprice)) / parseFloat(stock.averageprice)) * 100;
+                    const percentChangeCell = document.createElement('td');
+                    percentChangeCell.className = 'px-6 py-4';
+                    percentChangeCell.textContent = diff.toFixed(2) + '%';
+                    if (diff > 0) {
+                        percentChangeCell.classList.add("text-green-500");
+                    } else if (diff < 0) {
+                        percentChangeCell.classList.add("text-red-600");
+                    }
+
+                    // Edit Action
+                    const actionsCell = document.createElement('td');
+                    actionsCell.className = 'px-6 py-4';
+                    const editLink = document.createElement('a');
+                    editLink.href = 'details/' + stock.symbol;
+                    editLink.className = 'font-medium text-blue-600 dark:text-blue-500 hover:underline';
+                    editLink.textContent = 'Edit';
+                    actionsCell.appendChild(editLink);
+
+                    // Append all cells to the row
+                    row.appendChild(symbolCell);
+                    row.appendChild(quantityCell);
+                    row.appendChild(averagePriceCell);
+                    row.appendChild(currentPriceCell);
+                    row.appendChild(percentChangeCell);
+                    row.appendChild(actionsCell);
+
+                    // Append row to the table body
+                    tableBody.appendChild(row);
+                });
+            })
+            .catch(error => {
+                console.error('There was a problem with the fetch operation:', error);
+            });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        fetchAndRenderPortfolio();              // initial call immediately
+        setInterval(fetchAndRenderPortfolio, 1500); // repeat every 2 seconds
+    });
+</script>
+
+
+
+</div>
+
+{% endblock %}
