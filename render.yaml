@@ -13,5 +13,4 @@ services:
         value: False
       - key: SECRET_KEY
         generateValue: true
-      - key: BACKEND_URL
-        value: https://stalk-the-stock-django.onrender.com
+
