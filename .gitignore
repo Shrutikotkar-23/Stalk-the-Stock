@@ -1,0 +1,17 @@
+# Python
+*.pyc
+__pycache__/
+env/
+*.pyo
+
+# SQLite (optional)
+db.sqlite3
+
+# Mac system
+.DS_Store
+
+# VSCode
+.vscode/
+
+# Other
+*.log
